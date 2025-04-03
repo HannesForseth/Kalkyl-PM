@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JM Kalkyl</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React och ReactDOM via CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel för JSX-stöd -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- UPDATED: jsPDF for PDF generation with specific version -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <!-- html2canvas for converting HTML to canvas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <!-- Library check script -->
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        console.log('Libraries loaded status:');
+        console.log('jspdf available:', typeof window.jspdf !== 'undefined');
+        console.log('html2canvas available:', typeof window.html2canvas !== 'undefined');
+        
+        if (typeof window.jspdf === 'undefined') {
+          console.warn('jsPDF library not loaded correctly. Loading fallback...');
+          const script = document.createElement('script');
+          script.src = 'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js';
+          document.head.appendChild(script);
+        }
+      });
+    </script>
+    
+    <style>
+        /* Simulerade UI-komponenter från shadcn/ui */
+        .card {
+            background-color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        .card-header {
+            padding: 1.5rem 1.5rem 0 1.5rem;
+        }
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .card-content {
+            padding: 1.5rem;
+        }
+        /* Styles for PDF preview */
+        .pdf-preview {
+            font-family: 'Arial', sans-serif;
+            width: 210mm;
+            padding: 20mm;
+            margin: 0 auto;
+            background-color: white;
+        }
+        .pdf-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10mm;
+        }
+        .pdf-title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10mm 0;
+        }
+        .pdf-section {
+            margin-bottom: 8mm;
+        }
+        .pdf-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 8mm;
+        }
+        .pdf-table th, .pdf-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .pdf-table th {
+            background-color: #f2f2f2;
+        }
+        .pdf-footer {
+            margin-top: 15mm;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }
+        /* Installationsbolaget logo styling */
+        .company-logo {
+            color: #e86c00;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+        }
+        .logo-circle {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e86c00;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 8px;
+        }
+        .logo-i {
+            color: #e86c00;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .pdf-preview, .pdf-preview * {
+                visibility: visible;
+            }
+            .pdf-preview {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 210mm;
+                height: 297mm;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+
+    <!-- Simulera komponenter från shadcn/ui -->
+    <script type="text/babel">
+        window.Card = ({ className, children }) => (
+            <div className={`card ${className || ''}`}>{children}</div>
+        );
+        
+        window.CardHeader = ({ children }) => (
+            <div className="card-header">{children}</div>
+        );
+        
+        window.CardTitle = ({ children }) => (
+            <h3 className="card-title">{children}</h3>
+        );
+        
+        window.CardContent = ({ children }) => (
+            <div className="card-content">{children}</div>
+        );
+    </script>
+
+    <!-- JM-kalkyl-komponenten -->
+    <script type="text/babel">
+        // Installationsbolaget Logo Component
+        const InstallationsbolagetLogo = () => (
+          <div className="company-logo">
+            <div className="logo-circle">
+              <span className="logo-i">I</span>
+            </div>
+            <span>Installationsbolaget</span>
+          </div>
+        );
+        
+        const JMKalkyl = () => {
+          // State för kalkyldata
+          const [kalkylData, setKalkylData] = React.useState({
+            // Material
+            tillkommandeMaterial: 0,
+            avgaendeMaterial: 0,
+            tillkommandeAprislista: 0,
+            avgaendeAprislista: 0,
+            arvodeMaterialProcent: 0,
+            fraktMaterialProcent: 0,
+            
+            // Tjanster
+            ueOvrigaTjanster: 0,
+            isolering: 0,
+            tillkommandeIsolering: 0,
+            avgaendeIsolering: 0,
+            injusteringProcent: 0,
+            duInstrProcent: 0,
+            stallningar: 0,
+            ritningar: 0,
+            
+            // Projektledning och tjänster
+            projektLedningOvrigt: 0,
+            projektLedare: {
+              antal: 0,
+              kostnad: 0
+            },
+            entreprenadIngenjorProcent: 0,
+            
+            // Arbete
+            ledandeMontorAntal: 0,
+            ledandeMontorKostnad: 0,
+            montorAntal: 1,
+            montorKostnad: 0,
+            tillkommandeArbeteAntal: 1,
+            tillkommandeArbeteKostnad: 0,
+            restidAntal: 0,
+            restidKostnad: 0,
+            riskAntal: 0,
+            riskKostnad: 0,
+            redovisadAntalK1: 0,
+            redovisadKostnad: 0,
+            totalAntalK1Isolering: 0,
+            totalKostnad: 0,
+            
+            // Extra kostnader
+            extraKostnadProcent: 0,
+            extraKostnadArbeteProcent: 0,
+            
+            // A-priser tillagda
+            aPriser: []
+          });
+          
+          // State för beskrivningar och kundinfo
+          const [description, setDescription] = React.useState("");
+          const [showRot, setShowRot] = React.useState(false);
+          const [showExportPreview, setShowExportPreview] = React.useState(false);
+          const [showPdfPreview, setShowPdfPreview] = React.useState(false);
+          const [customerDetails, setCustomerDetails] = React.useState({
+            name: "",
+            address: "",
+            phone: "",
+            email: "",
+            projectName: ""
+          });
+          const [companyDetails, setCompanyDetails] = React.useState({
+            name: "Installationsbolaget",
+            address: "Industrivägen 1, Solna, 171 48",
+            phone: "",
+            email: "",
+            orgNr: "556978-3565"
+          });
+          
+          // State för ny á-pris-post
+          const [newPrice, setNewPrice] = React.useState({
+            beskrivning: "",
+            enhet: "st",
+            pris: 0
+          });
+          
+          // Refs
+          const exportTextRef = React.useRef(null);
+          const pdfPreviewRef = React.useRef(null);
+          
+          // Beräknade värden
+          const [calculated, setCalculated] = React.useState({
+            summaMaterial: 0,
+            arvodeMaterial: 0,
+            fraktMaterial: 0,
+            
+            summaTjanster: 0,
+            injustering: 0,
+            duInstr: 0,
+            
+            summaKoptaTjanster: 0,
+            projektledare: 0,
+            entreprenadIngenior: 0,
+            
+            ledandeMontorKostnad: 0,
+            montorKostnad: 0,
+            tillkommandeArbeteKostnad: 0,
+            restidKostnad: 0,
+            riskKostnad: 0,
+            redovisadKostnadBelopp: 0,
+            totalKostnadBelopp: 0,
+            summaArbete: 0,
+            
+            extraKostnad: 0,
+            extraKostnadArbete: 0,
+            
+            totalSumma: 0
+          });
+          
+          // Beräkna ROT-avdrag
+          const maxRotAmount = Math.min(calculated.summaArbete * 0.3, 50000);
+          const rotAmount = showRot ? maxRotAmount : 0;
+          
+          // Uppdatera beräknade värden när kalkylData ändras
+          React.useEffect(() => {
+            // Beräkna materialvärden
+            const summaMaterial = kalkylData.tillkommandeMaterial + 
+                                   kalkylData.avgaendeMaterial + 
+                                   kalkylData.tillkommandeAprislista + 
+                                   kalkylData.avgaendeAprislista;
+            
+            const arvodeMaterial = summaMaterial * (kalkylData.arvodeMaterialProcent / 100);
+            const fraktMaterial = summaMaterial * (kalkylData.fraktMaterialProcent / 100);
+            
+            // Beräkna tjänstevärden
+            const summaTjanster = kalkylData.ueOvrigaTjanster + 
+                                   kalkylData.isolering + 
+                                   kalkylData.tillkommandeIsolering + 
+                                   kalkylData.avgaendeIsolering;
+            
+            const injustering = summaTjanster * (kalkylData.injusteringProcent / 100);
+            const duInstr = kalkylData.ueOvrigaTjanster * (kalkylData.duInstrProcent / 100);
+            
+            // Beräkna köpta tjänster
+            const projektledare = kalkylData.projektLedare.antal * kalkylData.projektLedare.kostnad;
+            const summaKoptaTjanster = kalkylData.projektLedningOvrigt + projektledare;
+            
+            // Beräkna entreprenadingenjör
+            const entreprenadIngenior = (kalkylData.projektLedningOvrigt + projektledare) * 
+                                       (kalkylData.entreprenadIngenjorProcent / 100);
+            
+            // Beräkna arbetskostnader
+            const ledandeMontorKostnad = kalkylData.ledandeMontorAntal * kalkylData.ledandeMontorKostnad;
+            const montorKostnad = kalkylData.montorAntal * kalkylData.montorKostnad;
+            const tillkommandeArbeteKostnad = kalkylData.tillkommandeArbeteAntal * kalkylData.tillkommandeArbeteKostnad;
+            const restidKostnad = kalkylData.restidAntal * kalkylData.restidKostnad;
+            const riskKostnad = kalkylData.riskAntal * kalkylData.riskKostnad;
+            const redovisadKostnadBelopp = kalkylData.redovisadAntalK1 * kalkylData.redovisadKostnad;
+            const totalKostnadBelopp = kalkylData.totalAntalK1Isolering * kalkylData.totalKostnad;
+            
+            const summaArbete = ledandeMontorKostnad + montorKostnad + tillkommandeArbeteKostnad + 
+                               restidKostnad + riskKostnad + redovisadKostnadBelopp + totalKostnadBelopp;
+            
+            // Beräkna extra kostnader
+            const extraKostnad = (summaKoptaTjanster + summaTjanster) * (kalkylData.extraKostnadProcent / 100);
+            const extraKostnadArbete = summaArbete * (kalkylData.extraKostnadArbeteProcent / 100);
+            
+            // Beräkna total summa
+            const totalSumma = summaTjanster + injustering + duInstr + entreprenadIngenior + 
+                               summaArbete + summaKoptaTjanster + extraKostnad + extraKostnadArbete;
+            
+            // Uppdatera beräknade värden
+            setCalculated({
+              summaMaterial,
+              arvodeMaterial,
+              fraktMaterial,
+              
+              summaTjanster,
+              injustering,
+              duInstr,
+              
+              summaKoptaTjanster,
+              projektledare,
+              entreprenadIngenior,
+              
+              ledandeMontorKostnad,
+              montorKostnad,
+              tillkommandeArbeteKostnad,
+              restidKostnad,
+              riskKostnad,
+              redovisadKostnadBelopp,
+              totalKostnadBelopp,
+              summaArbete,
+              
+              extraKostnad,
+              extraKostnadArbete,
+              
+              totalSumma
+            });
+          }, [kalkylData]);
+          
+          // Hantera ändringar i inmatningsfält
+          const handleInputChange = (category, field, value) => {
+            setKalkylData(prevData => {
+              if (category) {
+                return {
+                  ...prevData,
+                  [category]: {
+                    ...prevData[category],
+                    [field]: parseFloat(value) || 0
+                  }
+                };
+              } else {
+                return {
+                  ...prevData,
+                  [field]: parseFloat(value) || 0
+                };
+              }
+            });
+          };
+          
+          // Hantera textinmatning (för beskrivning)
+          const handleTextChange = (e) => {
+            setDescription(e.target.value);
+          };
+          
+          // Hantera kunduppgifter
+          const handleCustomerChange = (field, value) => {
+            setCustomerDetails(prev => ({
+              ...prev,
+              [field]: value
+            }));
+          };
+          
+          // Hantera företagsuppgifter
+          const handleCompanyChange = (field, value) => {
+            setCompanyDetails(prev => ({
+              ...prev,
+              [field]: value
+            }));
+          };
+          
+          // Hantera á-pris
+          const handleAddPrice = () => {
+            if (newPrice.beskrivning && newPrice.pris) {
+              setKalkylData(prev => ({
+                ...prev,
+                aPriser: [
+                  ...prev.aPriser,
+                  { 
+                    id: Date.now(), 
+                    beskrivning: newPrice.beskrivning, 
+                    enhet: newPrice.enhet,
+                    pris: parseFloat(newPrice.pris)
+                  }
+                ]
+              }));
+              setNewPrice({ beskrivning: "", enhet: "st", pris: 0 });
+            }
+          };
+          
+          const handleDeletePrice = (id) => {
+            setKalkylData(prev => ({
+              ...prev,
+              aPriser: prev.aPriser.filter(item => item.id !== id)
+            }));
+          };
+          
+          const handlePriceChange = (e) => {
+            const { name, value } = e.target;
+            setNewPrice(prev => ({
+              ...prev,
+              [name]: name === 'pris' ? (parseFloat(value) || 0) : value
+            }));
+          };
+          
+          // Formatera nummer till valuta
+          const formatCurrency = (value) => {
+            return new Intl.NumberFormat('sv-SE', { 
+              style: 'currency', 
+              currency: 'SEK',
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0
+            }).format(value);
+          };
+          
+          // Generera exporttext
+          const generateExportText = () => {
+            let text = '';
+            
+            // Titel
+            text += `OFFERT: ${customerDetails.projectName || "Projektnamn"}\n\n`;
+            
+            // Företagsinfo
+            text += "FÖRETAG:\n";
+            text += `${companyDetails.name}\n`;
+            text += `${companyDetails.address}\n`;
+            text += `Tel: ${companyDetails.phone}\n`;
+            text += `E-post: ${companyDetails.email}\n`;
+            text += `Org.nr: ${companyDetails.orgNr}\n\n`;
+            
+            // Kundinfo
+            text += "KUND:\n";
+            text += `${customerDetails.name}\n`;
+            text += `${customerDetails.address}\n`;
+            text += `Tel: ${customerDetails.phone}\n`;
+            text += `E-post: ${customerDetails.email}\n\n`;
+            
+            // Beskrivning
+            text += "BESKRIVNING:\n";
+            text += `${description || "Ingen beskrivning tillgänglig."}\n\n`;
+            
+            // Kostnadssammanställning
+            text += "KOSTNADSSAMMANSTÄLLNING:\n";
+            text += "--------------------------------------------------------------\n";
+            text += "Beskrivning                  Mängd      Á-Pris      Summa\n";
+            text += "--------------------------------------------------------------\n";
+            
+            // Material
+            text += `Material                     1          ${calculated.summaMaterial} kr     ${calculated.summaMaterial} kr\n`;
+            
+            // Tjänster
+            text += `Tjänster                     1          ${calculated.summaTjanster} kr     ${calculated.summaTjanster} kr\n`;
+            
+            // Arbete
+            text += `Arbete                       ${kalkylData.montorAntal + kalkylData.tillkommandeArbeteAntal} h        Varierar     ${calculated.summaArbete} kr\n`;
+            
+            // Delsumma
+            text += "--------------------------------------------------------------\n";
+            text += `Delsumma exkl. moms                                 ${calculated.totalSumma} kr\n`;
+            
+            // Moms
+            text += `Moms 25%                                            ${(calculated.totalSumma * 0.25).toFixed(0)} kr\n`;
+            
+            // Total med moms
+            text += "--------------------------------------------------------------\n";
+            text += `Totalt inkl. moms                                   ${(calculated.totalSumma * 1.25).toFixed(0)} kr\n`;
+            
+            // ROT-avdrag om tillämpligt
+            if (showRot) {
+              text += `ROT-avdrag (30% av arbetskostnad)                  -${Math.floor(rotAmount)} kr\n`;
+              text += "--------------------------------------------------------------\n";
+              text += `Att betala efter ROT                               ${Math.floor(calculated.totalSumma * 1.25 - rotAmount)} kr\n`;
+            }
+            
+            // Betalningsvillkor
+            text += "\nBETALNINGSVILLKOR:\n";
+            text += "30 dagar netto från fakturadatum.\n";
+            text += "Offerten är giltig i 30 dagar.\n\n";
+            
+            // ROT-info
+            if (showRot) {
+              text += "ROT-AVDRAG INFORMATION:\n";
+              text += "För att få ROT-avdrag måste du äga fastigheten och vara folkbokförd på adressen.\n";
+              text += "Avdraget gäller endast för arbetskostnaden, inte material eller resor.\n\n";
+            }
+            
+            // Footer
+            text += "Företaget är godkänt för F-skatt. Alla priser anges i SEK.";
+            
+            return text;
+          };
+          
+          const copyExportText = () => {
+            if (exportTextRef.current) {
+              exportTextRef.current.select();
+              document.execCommand('copy');
+            }
+          };
+          
+          // UPDATED: Generera och ladda ner PDF
+          const generatePdf = async () => {
+            try {
+              if (!pdfPreviewRef.current) {
+                console.error("PDF preview reference is not available");
+                return;
+              }
+              
+              // Check if jsPDF is available
+              if (!window.jspdf) {
+                console.error("jsPDF library not found in window.jspdf");
+                alert("jsPDF-biblioteket kunde inte laddas. Ladda om sidan och försök igen.");
+                return;
+              }
+              
+              // Access the jsPDF constructor
+              const jsPDF = window.jspdf.jsPDF;
+              
+              // Create new document with proper orientation
+              const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+              });
+              
+              console.log("Creating PDF from element:", pdfPreviewRef.current);
+              
+              // Add a delay to ensure DOM is fully rendered
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              // Konvertera HTML element till canvas
+              const canvas = await html2canvas(pdfPreviewRef.current, {
+                scale: 2, // Högre upplösning
+                useCORS: true,
+                logging: true, // Enable logging for debugging
+                windowWidth: 794, // A4 width in pixels at 96dpi
+                windowHeight: 1123, // A4 height in pixels at 96dpi
+                allowTaint: true,
+                backgroundColor: '#ffffff'
+              });
+              
+              console.log("Canvas created successfully", canvas);
+              
+              const imgData = canvas.toDataURL('image/png');
+              const pdfWidth = pdf.internal.pageSize.getWidth();
+              const pdfHeight = pdf.internal.pageSize.getHeight();
+              
+              // Calculate the scaling
+              const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+              
+              pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight);
+              
+              // If document spans multiple pages, add new pages
+              const pageCount = Math.ceil(imgHeight / pdfHeight);
+              
+              if (pageCount > 1) {
+                console.log(`Document spans ${pageCount} pages`);
+                for (let i = 1; i < pageCount; i++) {
+                  pdf.addPage();
+                  pdf.addImage(
+                    imgData, 
+                    'PNG', 
+                    0, 
+                    -(i * pdfHeight), 
+                    pdfWidth, 
+                    imgHeight
+                  );
+                }
+              }
+              
+              // Ladda ner PDF-filen
+              const fileName = `Offert_${customerDetails.projectName || 'Projekt'}_${new Date().toISOString().split('T')[0]}.pdf`;
+              console.log("Saving PDF with filename:", fileName);
+              pdf.save(fileName);
+              
+            } catch (error) {
+              console.error("Error generating PDF:", error);
+              alert("Ett fel uppstod vid generering av PDF: " + error.message);
+            }
+          };
+          
+          // Använd de globala komponenterna från HTML-filen
+          const Card = window.Card;
+          const CardHeader = window.CardHeader;
+          const CardTitle = window.CardTitle;
+          const CardContent = window.CardContent;
+
+          return (
+            <div className="flex flex-col w-full max-w-6xl mx-auto p-4">
+              <h1 className="text-2xl font-bold mb-4">JM Kalkyl Sammanställning PM21</h1>
+              
+              <div className="flex flex-row gap-4 mb-6">
+                <Card className="w-1/2">
+                  <CardHeader>
+                    <CardTitle>Företagsuppgifter</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div className="flex flex-col">
+                        <label className="text-sm font-medium">Företagsnamn</label>
+                        <input 
+                          type="text" 
+                          value={companyDetails.name} 
+                          onChange={(e) => handleCompanyChange('name', e.target.value)}
+                          className="border rounded p-2"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-sm font-medium">Adress</label>
+                        <input 
+                          type="text" 
+                          value={companyDetails.address} 
+                          onChange={(e) => handleCompanyChange('address', e.target.value)}
+                          className="border rounded p-2"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-sm font-medium">Telefon</label>
+                        <input 
+                          type="text" 
+                          value={companyDetails.phone} 
+                          onChange={(e) => handleCompanyChange('phone', e.target.value)}
+                          className="border rounded p-2"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-sm font-medium">E-post</label>
+                        <input 
+                          type="text" 
+                          value={companyDetails.email} 
+                          onChange={(e) => handleCompanyChange('email', e.target.value)}
+                          className="border rounded p-2"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-sm font-medium">Org.nr</label>
+                        <input 
+                          type="text" 
+                          value={companyDetails.orgNr} 
+                          onChange={(e) => handleCompanyChange('orgNr', e.target.value)}
+                          className="border rounded p-2"
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="w-1/2">
+                  <CardHeader>
+                    <CardTitle>Kunduppgifter</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div className="flex flex-col">
+                        <label className="text-sm font-medium">Projektnamn</label>
+                        <input 
+                          type="text" 
+                          value={customerDetails.projectName} 
+                          onChange={(e) => handleCustomerChange('projectName', e.target.value)}
+                          className="border rounded p-2"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-sm font-medium">Kundnamn</label>
+                        <input 
+                          type="text" 
+                          value={customerDetails.name} 
+                          onChange={(e) => handleCustomerChange('name', e.target.value)}
+                          className="border rounded p-2"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-sm font-medium">Adress</label>
+                        <input 
+                          type="text" 
+                          value={customerDetails.address} 
+                          onChange={(e) => handleCustomerChange('address', e.target.value)}
+                          className="border rounded p-2"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-sm font-medium">Telefon</label>
+                        <input 
+                          type="text" 
+                          value={customerDetails.phone} 
+                          onChange={(e) => handleCustomerChange('phone', e.target.value)}
+                          className="border rounded p-2"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-sm font-medium">E-post</label>
+                        <input 
+                          type="text" 
+                          value={customerDetails.email} 
+                          onChange={(e) => handleCustomerChange('email', e.target.value)}
+                          className="border rounded p-2"
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle>Projektbeskrivning</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <textarea 
+                    value={description}
+                    onChange={handleTextChange}
+                    className="border rounded p-2 w-full h-32"
+                    placeholder="Ange en detaljerad beskrivning av projektet..."
+                  />
+                </CardContent>
+              </Card>
+              
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle>Á-Priser</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4">
+                    <h3 className="text-lg font-medium mb-2">Lägg till ny á-pris</h3>
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="flex flex-col col-span-2">
+                        <label className="text-sm font-medium">Beskrivning</label>
+                        <input 
+                          type="text" 
+                          name="beskrivning"
+                          value={newPrice.beskrivning} 
+                          onChange={handlePriceChange}
+                          className="border rounded p-2"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-sm font-medium">Enhet</label>
+                        <select 
+                          name="enhet"
+                          value={newPrice.enhet} 
+                          onChange={handlePriceChange}
+                          className="border rounded p-2"
+                        >
+                          <option value="st">st</option>
+                          <option value="tim">tim</option>
+                          <option value="m">m</option>
+                          <option value="m²">m²</option>
+                          <option value="m³">m³</option>
+                          <option value="förp">förp</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-sm font-medium">Pris (SEK)</label>
+                        <div className="flex">
+                          <input 
+                            type="number" 
+                            name="pris"
+                            value={newPrice.pris} 
+                            onChange={handlePriceChange}
+                            className="border rounded-l p-2 flex-grow"
+                          />
+                          <button 
+                            onClick={handleAddPrice}
+                            className="bg-blue-500 text-white rounded-r px-4"
+                          >
+                            Lägg till
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-lg font-medium mb-2">Sparade á-priser</h3>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Beskrivning</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enhet</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pris</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Åtgärd</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {kalkylData.aPriser.map((item) => (
+                            <tr key={item.id}>
+                              <td className="px-6 py-4 whitespace-nowrap">{item.beskrivning}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{item.enhet}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(item.pris)}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <button 
+                                  onClick={() => handleDeletePrice(item.id)}
+                                  className="text-red-600 hover:text-red-900"
+                                >
+                                  Ta bort
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle>Material</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Tillkommande material</label>
+                      <input 
+                        type="number" 
+                        value={kalkylData.tillkommandeMaterial} 
+                        onChange={(e) => handleInputChange(null, 'tillkommandeMaterial', e.target.value)}
+                        className="border rounded p-2"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Avgående material</label>
+                      <input 
+                        type="number" 
+                        value={kalkylData.avgaendeMaterial} 
+                        onChange={(e) => handleInputChange(null, 'avgaendeMaterial', e.target.value)}
+                        className="border rounded p-2"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Summa material</label>
+                      <div className="border rounded p-2 bg-gray-100">
+                        {formatCurrency(calculated.summaMaterial)}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Arvode material (%)</label>
+                      <input 
+                        type="number" 
+                        value={kalkylData.arvodeMaterialProcent} 
+                        onChange={(e) => handleInputChange(null, 'arvodeMaterialProcent', e.target.value)}
+                        className="border rounded p-2"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Arvode belopp</label>
+                      <div className="border rounded p-2 bg-gray-100">
+                        {formatCurrency(calculated.arvodeMaterial)}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle>Tjänster & Arbete</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">UE & Övriga tjänster</label>
+                      <input 
+                        type="number" 
+                        value={kalkylData.ueOvrigaTjanster} 
+                        onChange={(e) => handleInputChange(null, 'ueOvrigaTjanster', e.target.value)}
+                        className="border rounded p-2"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Injustering (%)</label>
+                      <input 
+                        type="number" 
+                        value={kalkylData.injusteringProcent} 
+                        onChange={(e) => handleInputChange(null, 'injusteringProcent', e.target.value)}
+                        className="border rounded p-2"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Injustering belopp</label>
+                      <div className="border rounded p-2 bg-gray-100">
+                        {formatCurrency(calculated.injustering)}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Montör antal timmar</label>
+                      <input 
+                        type="number" 
+                        value={kalkylData.montorAntal} 
+                        onChange={(e) => handleInputChange(null, 'montorAntal', e.target.value)}
+                        className="border rounded p-2"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Montör timpris</label>
+                      <input 
+                        type="number" 
+                        value={kalkylData.montorKostnad} 
+                        onChange={(e) => handleInputChange(null, 'montorKostnad', e.target.value)}
+                        className="border rounded p-2"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Montör kostnad</label>
+                      <div className="border rounded p-2 bg-gray-100">
+                        {formatCurrency(calculated.montorKostnad)}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Tillkommande arbete timmar</label>
+                      <input 
+                        type="number" 
+                        value={kalkylData.tillkommandeArbeteAntal} 
+                        onChange={(e) => handleInputChange(null, 'tillkommandeArbeteAntal', e.target.value)}
+                        className="border rounded p-2"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Tillkommande arbete timpris</label>
+                      <input 
+                        type="number" 
+                        value={kalkylData.tillkommandeArbeteKostnad} 
+                        onChange={(e) => handleInputChange(null, 'tillkommandeArbeteKostnad', e.target.value)}
+                        className="border rounded p-2"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Tillkommande arbete kostnad</label>
+                      <div className="border rounded p-2 bg-gray-100">
+                        {formatCurrency(calculated.tillkommandeArbeteKostnad)}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle>Sammanställning</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Tjänster</label>
+                      <div className="border rounded p-2 bg-gray-100">
+                        {formatCurrency(calculated.summaTjanster)}
+                      </div>
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Injustering</label>
+                      <div className="border rounded p-2 bg-gray-100">
+                        {formatCurrency(calculated.injustering)}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Köpta tjänster</label>
+                      <div className="border rounded p-2 bg-gray-100">
+                        {formatCurrency(calculated.summaKoptaTjanster)}
+                      </div>
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Entreprenadingenjör</label>
+                      <div className="border rounded p-2 bg-gray-100">
+                        {formatCurrency(calculated.entreprenadIngenior)}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Summa arbete</label>
+                      <div className="border rounded p-2 bg-gray-100">
+                        {formatCurrency(calculated.summaArbete)}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Delsumma exkl. moms</label>
+                      <div className="border rounded p-2 bg-gray-100">
+                        {formatCurrency(calculated.totalSumma)}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium">Moms 25%</label>
+                      <div className="border rounded p-2 bg-gray-100">
+                        {formatCurrency(calculated.totalSumma * 0.25)}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col">
+                      <label className="text-sm font-medium font-bold">Totalt inkl. moms</label>
+                      <div className="border rounded p-2 bg-blue-100 font-bold text-lg">
+                        {formatCurrency(calculated.totalSumma * 1.25)}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center col-span-2 mt-4">
+                      <input
+                        type="checkbox"
+                        id="rotavdrag"
+                        checked={showRot}
+                        onChange={() => setShowRot(!showRot)}
+                        className="mr-2"
+                      />
+                      <label htmlFor="rotavdrag" className="text-sm font-medium">
+                        Berättigad till ROT-avdrag (30% av arbetskostnad)
+                      </label>
+                    </div>
+                    
+                    {showRot && (
+                      <React.Fragment>
+                        <div className="flex flex-col">
+                          <label className="text-sm font-medium">ROT-avdrag</label>
+                          <div className="border rounded p-2 bg-gray-100">
+                            {formatCurrency(-rotAmount)}
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-col">
+                          <label className="text-sm font-medium font-bold">Att betala efter ROT</label>
+                          <div className="border rounded p-2 bg-green-100 font-bold text-lg">
+                            {formatCurrency(calculated.totalSumma * 1.25 - rotAmount)}
+                          </div>
+                        </div>
+                      </React.Fragment>
+                    )}
+                  </div>
+                  
+                  <div className="mt-6 flex gap-4">
+                    <button 
+                      onClick={() => setShowExportPreview(true)} 
+                      className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded flex items-center"
+                    >
+                      <span className="mr-2">📋</span>
+                      Förhandsgranska text
+                    </button>
+                    
+                    <button 
+                      onClick={() => setShowPdfPreview(true)} 
+                      className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded flex items-center"
+                    >
+                      <span className="mr-2">📄</span>
+                      Skapa PDF-offert
+                    </button>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Export Preview Modal */}
+              {showExportPreview && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl max-h-screen overflow-y-auto">
+                    <h2 className="text-xl font-bold mb-4">Förhandsgranskning av offert</h2>
+                    
+                    <div className="border p-4 mb-4 bg-gray-50 font-mono text-sm whitespace-pre-wrap">
+                      {generateExportText()}
+                    </div>
+                    
+                    <div className="flex justify-between">
+                      <button 
+                        onClick={() => setShowExportPreview(false)}
+                        className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"
+                      >
+                        Stäng
+                      </button>
+                      
+                      <div className="flex gap-2">
+                        <textarea
+                          ref={exportTextRef}
+                          value={generateExportText()}
+                          readOnly
+                          className="hidden"
+                        />
+                        <button 
+                          onClick={copyExportText}
+                          className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded"
+                        >
+                          Kopiera text
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* PDF Preview Modal */}
+              {showPdfPreview && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-5xl max-h-screen overflow-y-auto">
+                    <h2 className="text-xl font-bold mb-4">PDF Offert - Förhandsgranskning</h2>
+                    
+                    <div className="overflow-y-auto mb-4 border shadow-lg" style={{ maxHeight: '70vh' }}>
+                      <div ref={pdfPreviewRef} className="pdf-preview">
+                        {/* PDF Header with Logo */}
+                        <div className="pdf-header">
+                          <div>
+                            {/* Use Installationsbolaget logo */}
+                            <InstallationsbolagetLogo />
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '12px', marginBottom: '5px' }}>Datum: {new Date().toLocaleDateString('sv-SE')}</div>
+                            <div style={{ fontSize: '12px', marginBottom: '5px' }}>Offert #: {Math.floor(Math.random() * 10000) + 1000}</div>
+                            <div style={{ fontSize: '12px' }}>Giltighet: 30 dagar</div>
+                          </div>
+                        </div>
+                        
+                        {/* PDF Title */}
+                        <div className="pdf-title">
+                          OFFERT: {customerDetails.projectName || "Projektnamn"}
+                        </div>
+                        
+                        {/* Contact Information */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
+                          <div style={{ width: '45%' }}>
+                            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '5px', borderBottom: '1px solid #ddd', paddingBottom: '3px' }}>FÖRETAGSINFORMATION</h3>
+                            <div style={{ fontSize: '14px', marginBottom: '3px' }}><strong>{companyDetails.name}</strong></div>
+                            <div style={{ fontSize: '14px', marginBottom: '3px' }}>{companyDetails.address}</div>
+                            <div style={{ fontSize: '14px', marginBottom: '3px' }}>Tel: {companyDetails.phone}</div>
+                            <div style={{ fontSize: '14px', marginBottom: '3px' }}>E-post: {companyDetails.email}</div>
+                            <div style={{ fontSize: '14px' }}>Org.nr: {companyDetails.orgNr}</div>
+                          </div>
+                          
+                          <div style={{ width: '45%' }}>
+                            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '5px', borderBottom: '1px solid #ddd', paddingBottom: '3px' }}>KUNDINFORMATION</h3>
+                            <div style={{ fontSize: '14px', marginBottom: '3px' }}><strong>{customerDetails.name || "Kundnamn"}</strong></div>
+                            <div style={{ fontSize: '14px', marginBottom: '3px' }}>{customerDetails.address || "Kundadress"}</div>
+                            <div style={{ fontSize: '14px', marginBottom: '3px' }}>Tel: {customerDetails.phone || "-"}</div>
+                            <div style={{ fontSize: '14px' }}>E-post: {customerDetails.email || "-"}</div>
+                          </div>
+                        </div>
+                        
+                        {/* Project Description */}
+                        <div className="pdf-section">
+                          <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '5px', borderBottom: '1px solid #ddd', paddingBottom: '3px' }}>PROJEKTBESKRIVNING</h3>
+                          <div style={{ fontSize: '14px', lineHeight: '1.4' }}>
+                            {description || "Ingen beskrivning tillgänglig."}
+                          </div>
+                        </div>
+                        
+                        {/* Cost Summary */}
+                        <div className="pdf-section">
+                          <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px', borderBottom: '1px solid #ddd', paddingBottom: '3px' }}>KOSTNADSSAMMANSTÄLLNING</h3>
+                          
+                          <table className="pdf-table">
+                            <thead>
+                              <tr>
+                                <th style={{ width: '50%' }}>Beskrivning</th>
+                                <th style={{ width: '15%' }}>Mängd</th>
+                                <th style={{ width: '15%' }}>Á-Pris</th>
+                                <th style={{ width: '20%' }}>Summa</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td>Material</td>
+                                <td>1</td>
+                                <td>{formatCurrency(calculated.summaMaterial)}</td>
+                                <td>{formatCurrency(calculated.summaMaterial)}</td>
+                              </tr>
+                              
+                              <tr>
+                                <td>Tjänster</td>
+                                <td>1</td>
+                                <td>{formatCurrency(calculated.summaTjanster)}</td>
+                                <td>{formatCurrency(calculated.summaTjanster)}</td>
+                              </tr>
+                              
+                              <tr>
+                                <td>Arbete</td>
+                                <td>{kalkylData.montorAntal + kalkylData.tillkommandeArbeteAntal} h</td>
+                                <td>Varierar</td>
+                                <td>{formatCurrency(calculated.summaArbete)}</td>
+                              </tr>
+                              
+                              {/* A-priser om det finns några */}
+                              {kalkylData.aPriser.length > 0 && (
+                                <tr>
+                                  <td colSpan="4" style={{ fontWeight: 'bold', backgroundColor: '#f8f8f8' }}>Á-Priser</td>
+                                </tr>
+                              )}
+                              
+                              {kalkylData.aPriser.map((item, index) => (
+                                <tr key={index}>
+                                  <td>{item.beskrivning}</td>
+                                  <td>1 {item.enhet}</td>
+                                  <td>{formatCurrency(item.pris)}</td>
+                                  <td>{formatCurrency(item.pris)}</td>
+                                </tr>
+                              ))}
+                              
+                              <tr>
+                                <td colSpan="3" style={{ textAlign: 'right', fontWeight: 'bold' }}>Delsumma exkl. moms:</td>
+                                <td style={{ fontWeight: 'bold' }}>{formatCurrency(calculated.totalSumma)}</td>
+                              </tr>
+                              
+                              <tr>
+                                <td colSpan="3" style={{ textAlign: 'right' }}>Moms 25%:</td>
+                                <td>{formatCurrency(calculated.totalSumma * 0.25)}</td>
+                              </tr>
+                              
+                              <tr>
+                                <td colSpan="3" style={{ textAlign: 'right', fontWeight: 'bold' }}>Totalt inkl. moms:</td>
+                                <td style={{ fontWeight: 'bold', backgroundColor: '#e6f7ff' }}>{formatCurrency(calculated.totalSumma * 1.25)}</td>
+                              </tr>
+                              
+                              {showRot && (
+                                <>
+                                  <tr>
+                                    <td colSpan="3" style={{ textAlign: 'right' }}>ROT-avdrag (30% av arbetskostnad):</td>
+                                    <td style={{ color: 'green' }}>{formatCurrency(-rotAmount)}</td>
+                                  </tr>
+                                  
+                                  <tr>
+                                    <td colSpan="3" style={{ textAlign: 'right', fontWeight: 'bold' }}>Att betala efter ROT:</td>
+                                    <td style={{ fontWeight: 'bold', backgroundColor: '#e6ffe6' }}>{formatCurrency(calculated.totalSumma * 1.25 - rotAmount)}</td>
+                                  </tr>
+                                </>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                        
+                        {/* Payment Terms */}
+                        <div className="pdf-section">
+                          <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '5px', borderBottom: '1px solid #ddd', paddingBottom: '3px' }}>BETALNINGSVILLKOR</h3>
+                          <div style={{ fontSize: '14px', marginBottom: '5px' }}>30 dagar netto från fakturadatum.</div>
+                          <div style={{ fontSize: '14px' }}>Offerten är giltig i 30 dagar från ovanstående datum.</div>
+                        </div>
+                        
+                        {/* ROT Information if applicable */}
+                        {showRot && (
+                          <div className="pdf-section">
+                            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '5px', borderBottom: '1px solid #ddd', paddingBottom: '3px' }}>ROT-AVDRAG INFORMATION</h3>
+                            <div style={{ fontSize: '14px', marginBottom: '5px' }}>För att få ROT-avdrag måste du äga fastigheten och vara folkbokförd på adressen.</div>
+                            <div style={{ fontSize: '14px' }}>Avdraget gäller endast för arbetskostnaden, inte material eller resor.</div>
+                          </div>
+                        )}
+                        
+                        {/* Footer */}
+                        <div className="pdf-footer">
+                          <div style={{ marginBottom: '5px' }}>{companyDetails.name} är godkänt för F-skatt. Alla priser anges i SEK.</div>
+                          <div>Tack för att du väljer oss för ditt projekt!</div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-between">
+                      <button 
+                        onClick={() => setShowPdfPreview(false)}
+                        className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"
+                      >
+                        Stäng
+                      </button>
+                      
+                      <button 
+                        onClick={generatePdf}
+                        className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded flex items-center"
+                      >
+                        <span className="mr-2">💾</span>
+                        Ladda ner PDF
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        };
+    </script>
+
+    <!-- Rendera komponenten -->
+    <script type="text/babel">
+        ReactDOM.render(<JMKalkyl />, document.getElementById('root'));
+    </script>
+</body>
+</html>
